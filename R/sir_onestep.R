@@ -1,6 +1,23 @@
-
-
-run_sir_step <- function(N, I0, gamma, beta1, beta2, change_time, times=seq(0,100, by=1)){
+#' Simulate SIR Model with Single Time-Varying Transmission Rate
+#'
+#' @param N Total population size
+#' @param I0 Initial number of infected individuals
+#' @param gamma Recovery rate (1/infectious period)
+#' @param beta1 Transmission rate before change point
+#' @param beta2 Transmission rate after change point
+#' @param change_time Change point of transmission rate
+#' @param times Vector of times at which to return output (default: 0 to 100 by 1)
+#'
+#' @return A list containing:
+#'   \item{times}{Time points}
+#'   \item{S}{Susceptible counts over time}
+#'   \item{I}{Infected counts over time}
+#'   \item{R}{Recovered counts over time}
+#'   \item{beta}{Transmission rate over time}
+#'   \item{parameters}{List of parameters used}
+#'
+#' @export
+sir_onestep <- function(N, I0, gamma, beta1, beta2, change_time, times){
 
   # Validate inputs
   if (N <= 0) stop("N must be positive")
@@ -35,7 +52,9 @@ run_sir_step <- function(N, I0, gamma, beta1, beta2, change_time, times=seq(0,10
     beta1 = beta1,
     beta2 = beta2,
     change_time = change_time,
-    gamma = gamma
+    gamma = gamma,
+    times = seq(0,end_point, by=1),
+    end_point = end_point
   )
 
   # create dust2 system
