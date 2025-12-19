@@ -28,7 +28,7 @@ estimate_rt_constant_ml <- function(incidence, N, gamma = 1/7,
     I0 <- max(1, round(mean(head(cases, min(5, Tn))) * (1 / gamma)))
   }
 
-  # odin2 generator (must define inc_step; make_sir_generator() in your package)
+  # odin2 generator
   gen <- make_sir_generator()
 
   # Pure Poisson likelihood (NO PRIOR, see estimate_rt_simple for function with priors)
