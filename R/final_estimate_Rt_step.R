@@ -1,11 +1,12 @@
 
-#' Rt(t) with stepwise beta(t), fixed gamma; infer I0 and beta blocks via MH-RW MCMC
-#' Canonical odin2 -> dust2 -> monty workflow (deterministic likelihood)
+#' Rt(t) with stepwise beta(t), fixed gamma; infer I0 and beta blocks via Metropolis-Hastings random walk MCMC
+#' Using full odin2 -> dust2 -> monty workflow (deterministic likelihood)
 #'
 #' @param incidence data.frame with columns: time (consecutive integers), cases >= 0.
-#'        Time can start at any integer; we keep it (Option A) and set time_start to "first time - 1".
+#'        Time can start at any integer; we keep it and set time_start to "first time - 1".
 #' @param N Numeric scalar > 0, population size
 #' @param gamma Numeric scalar > 0, fixed recovery rate
+#' @param R Immunity existing in population, default = 0
 #' @param beta_step Integer block length (e.g., 7) OR provide `beta_breaks`
 #' @param beta_breaks Integer vector in ORIGINAL time units; mapped to indices internally
 #' @param mcmc List: n_steps (6000), burnin (0.5), proposal (NULL -> diag(0.02^2)), seed (4),
