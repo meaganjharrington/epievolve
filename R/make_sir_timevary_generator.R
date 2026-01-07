@@ -2,11 +2,11 @@
 #' Discrete-time deterministic SIR with stepwise beta(t) and Poisson observation
 make_sir_timevary_generator <- function() {
   odin2::odin({
-    ## States
-    initial(S) <- N - I0
+    ## Initial states
+    initial(S) <- N - I0 - R
     initial(I) <- I0
-    initial(R) <- 0
-    initial(incidence) <- 0  # new infections per step
+    initial(R) <- R # allow user to specify existing immunity, default 0
+    initial(incidence, zero_every = 1) <- 0  # Reset every step
 
     ## Hazards per step (dt)
     p_SI <- 1 - exp(-beta_t * I / N * dt)  # infection
@@ -34,6 +34,7 @@ make_sir_timevary_generator <- function() {
     N     <- parameter()
     I0    <- parameter()
     gamma <- parameter()
+    R <- parameter(0) # default 0
 
     ## Observation model on incidence
     cases <- data()
