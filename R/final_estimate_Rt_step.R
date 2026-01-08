@@ -1,9 +1,8 @@
-
 #' Rt(t) with stepwise beta(t), fixed gamma; infer I0 and beta blocks via Metropolis-Hastings random walk MCMC
 #' Using full odin2 -> dust2 -> monty workflow (deterministic likelihood)
 #'
 #' @param incidence data.frame with columns: time (consecutive integers), cases >= 0.
-#'        Time can start at any integer; we keep it and set time_start to "first time - 1".
+#'        Time can start at any integer, we keep it and set time_start to "first time - 1".
 #' @param N Numeric scalar > 0, population size
 #' @param gamma Numeric scalar > 0, fixed recovery rate
 #' @param R Immunity existing in population, default = 0
@@ -220,6 +219,7 @@ final_estimate_Rt_step <- function(
       I0 = data.frame(I0_median = I0_q[1], I0_lower = I0_q[2], I0_upper = I0_q[3])
     ),
     Rt_series = data.frame(time = time_vec, Rt_median = Rt_med),
+    St_series = data.frame(time = time_vec, St = S_t),
     model_used = "SIR_deterministic_step_beta_gamma_fixed_dust2_monty",
     blocks = list(beta_starts = starts, beta_ends = ends),
     fixed = list(N = N, gamma = gamma)
