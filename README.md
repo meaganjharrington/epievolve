@@ -36,7 +36,7 @@ out <- final_estimate_Rt_step(
 incidence = df,
 N = 1e6,
 gamma = 1/6,
-beta_breaks = c(1, 17, 35)
+beta_breaks = c(1, 3)
 )
 
 plot(out$Rt_series)

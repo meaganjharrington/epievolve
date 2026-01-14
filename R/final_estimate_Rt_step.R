@@ -27,7 +27,7 @@ final_estimate_Rt_step <- function(
     inits  = list(beta = 0.3, I0 = 10) # initial values for MCMC
 ) {
 
-  ## Validate main inputs
+  ## Validate main inputs - error messages
   stopifnot(is.data.frame(incidence), all(c("time","cases") %in% names(incidence))) # incidence should include time and case columns
   stopifnot(all(incidence$cases %% 1 == 0)) # cases as integer!
   cases <- incidence$cases
@@ -41,7 +41,7 @@ final_estimate_Rt_step <- function(
   time1 <- time_vec[1L] # first observed time point
   time0 <- time1 - 1 # model start time (dust requirement (?), start time < first obs time)(so we prepend the first beta value)
 
-  ## Pull MCMC settings with defaults
+  ## Pull MCMC settings from inputs with backup defaults
   get <- function(x, n, d) if (!is.null(x[[n]])) x[[n]] else d # helper function, pull MCMC settings, with defaults
   n_steps     <- get(mcmc, "n_steps", 6000)
   burnin      <- get(mcmc, "burnin", 0.5)
@@ -60,7 +60,7 @@ final_estimate_Rt_step <- function(
 
   I0 <- init_I0
   if (I0 >= N) return(-Inf) # sanity check: I0 < N
-  # if (R >= N) return(-Inf) # sanity check: R < N
+  # if (R >= N) return(-Inf) # sanity check: R < N # add back in once
 
   ## Beta blocks - time periods with constant transmission rate (piecewise constant)
   ## beta_breaks are supplied in ORIGINAL time units; map to 1-based positions
@@ -74,7 +74,7 @@ final_estimate_Rt_step <- function(
         stop("First beta block must start at the first observation.")
       return(indices_of_betabreaks)
     }
-    1L # if no breaks provided, single beta block starting at 1
+    1L # if no breaks provided, single beta block starting at 1 (i.e. only one continuous time period, no breaks)
   }
 
   starts <- make_breaks(beta_breaks, time_vec)
@@ -93,14 +93,14 @@ final_estimate_Rt_step <- function(
     for (k in seq_along(starts)) out[starts[k]:ends[k]] <- vals[k]
     out
   }
-  q3 <- function(x) stats::quantile(x, c(0.5, 0.025, 0.975), na.rm = TRUE)
+  q3 <- function(x) stats::quantile(x, c(0.5, 0.025, 0.975), na.rm = TRUE) # extract median, 95% CI
 
-  ## odin2 generator
+  ## odin2 generator from make_sir_timevary_generator
   gen <- make_sir_timevary_generator()
 
   ## Build a dust2 deterministic likelihood
   dust_data <- data.frame(time = time_vec, cases = cases)
-  unfilter  <- dust2::dust_unfilter_create(
+  filter  <- dust2::dust_filter_create(
     gen,
     data = dust_data,
     time_start = time0,  # strictly less than first data time
@@ -108,7 +108,7 @@ final_estimate_Rt_step <- function(
   )
 
   ## Likelihood using dust2
-  loglik <- function(theta) {
+  loglikelihood <- function(theta) {
     log_b <- theta[seq_len(K)]
     log_I <- theta[K + 1L]
     I0    <- exp(log_I); if (!is.finite(I0) || I0 <= 0) return(-Inf)
@@ -125,32 +125,32 @@ final_estimate_Rt_step <- function(
       beta_times  = beta_times_aug
     )
 
-    sum(dust2::dust_likelihood_run(unfilter, pars))
+    sum(dust2::dust_likelihood_run(filter, pars))
   }
 
   ## Priors (log-scale)
   logprior <- function(theta) { # Defines log prior density.
     log_b <- theta[seq_len(K)]; log_I <- theta[K + 1L]
     p_b_ind <- sum(stats::dnorm(log_b, mean = mean_beta, sd = sd_beta, log = TRUE)) #Independent priors on log β blocks
-    p_b_rw  <- if (K > 1) sum(stats::dnorm(diff(log_b), mean = 0, sd = rw_sd_beta, log = TRUE)) else 0 # random-walk smoothing prior between adjacent β blocks.
+    p_b_rw  <- if (K > 1) sum(stats::dnorm(diff(log_b), mean = 0, sd = rw_sd_beta, log = TRUE)) else 0 # random-walk smoothing prior between adjacent β blocks (i.e. don't accept wild jumps between blocks)
     p_I     <- stats::dnorm(log_I, mean = mean_I0, sd = sd_I0, log = TRUE)
     p_b_ind + p_b_rw + p_I
   }
 
   ## Posterior
   density_theta <- function(theta)
-    loglik(theta) + logprior(theta) # posterior log density used by monty.
+    loglikelihood(theta) + logprior(theta) # posterior log density used by monty.
 
   ## MCMC via monty (random-walk MH)
   mod <- monty::monty_model(list(density = density_theta, parameters = par_names)) # monty model object (w/ density and pars)(density = log posterior density to sample from)
   set.seed(seed) # fixed random number gen
   sampler <- monty::monty_sampler_random_walk(proposal) # cteaye rw MH sampler
   n_burn  <- floor(burnin * n_steps) # compute burn-in no (burnin 0.5 = first 1/2 of samples dropped)(?)
-  smp     <- monty::monty_sample(mod, sampler, n_steps, initial = init, n_chains = 1) # runs MCMC!
+  sample     <- monty::monty_sample(mod, sampler, n_steps, initial = init, n_chains = 1) # runs MCMC!
   # runs n_steps iterations, produces monty_samples w/ parameter values each time
 
   ## Extract post-burnin samples
-  pars <- smp$pars; # extract raw MCMC parameter array (dimensions vary by chain no)
+  pars <- sample$pars; # extract raw MCMC parameter array (dimensions vary by chain no)
     dims <- dim(pars); # stores array dimensions
       indices <- (n_burn + 1):dims[2] # indicies of post-burnin iterations
   extract_post <- if (length(dims) == 3) as.matrix(pars[, indices, 1, drop = FALSE]) else as.matrix(pars[, indices, drop = FALSE])
@@ -169,7 +169,7 @@ final_estimate_Rt_step <- function(
   beta_blocks_samp <- exp(extract_post[1:K, , drop = FALSE])
   I0_samp          <- exp(extract_post[K + 1, , drop = FALSE])
 
-  beta_q <- t(apply(beta_blocks_samp, 1, q3)) # posterior summaries for each beta block (? - is this needed)
+  beta_q <- apply(beta_blocks_samp, 2, q3) # changed, see if still works # posterior summaries for each beta block (? - is this needed)
   I0_q <- q3(I0_samp) # posterior median/95% interval for I0 (? - is this necessary)
 
   ## Medians and Rt(t)
@@ -197,6 +197,8 @@ final_estimate_Rt_step <- function(
   rn_med <- rownames(res_med)
   if (!is.null(rn_med)) {
     S_row   <- which(rn_med == "S")
+    #I_row   <- which(rn_med == "I")
+    #R_row   <- which(rn_med == "R")
     inc_row <- which(rn_med == "incidence")
   } else {
     # fallback if rownames missing
@@ -205,8 +207,12 @@ final_estimate_Rt_step <- function(
   }
 
   S_t        <- as.numeric(res_med[S_row, ])
+  #I_t        <- as.numeric(res_med[I_row, ])
   lambda_med <- pmax(as.numeric(res_med[inc_row, ]), 1e-12)
-  Rt_med     <- (beta_med_series * S_t) / (gamma * N)
+  Rt_median     <- (beta_med_series * S_t) / (gamma * N)
+
+  ## NEW!! - need to check this approach works/is accurate
+
 
   ## Return
   list(
@@ -218,10 +224,77 @@ final_estimate_Rt_step <- function(
       ),
       I0 = data.frame(I0_median = I0_q[1], I0_lower = I0_q[2], I0_upper = I0_q[3])
     ),
-    Rt_series = data.frame(time = time_vec, Rt_median = Rt_med),
+    Rt_series = data.frame(time = time_vec, Rt_median = Rt_median),
     St_series = data.frame(time = time_vec, St = S_t),
+    Rt_lower = data.frame(time = time_vec, Rt_lower = Rt_lower),
+    Rt_upper = data.frame(time = time_vec, Rt_upper = Rt_upper),
+    #It_series = data.frame(t = time_vec, It = I_t),
     model_used = "SIR_deterministic_step_beta_gamma_fixed_dust2_monty",
     blocks = list(beta_starts = starts, beta_ends = ends),
-    fixed = list(N = N, gamma = gamma)
+    fixed = list(N = N, gamma = gamma),
+
+    diagnostics = sample$diagnostics # need to get working
   )
 }
+
+
+
+
+## Archive
+# trying to extract and run 95% CIs with median
+#
+# Rt_lower <- Rt_upper <- rep(NA_real_, timepoints)
+#
+# if (n_rt_draws > 0) {
+#
+#   ## Start with all posterior draws
+#   draw_index <- seq_len(ncol(beta_blocks_samp))
+#
+#   ## Storage: rows = time, cols = posterior draws
+#   Rt_mat <- matrix(NA_real_, nrow = timepoints, ncol = length(draw_index))
+#
+#   for (i in seq_along(draw_index)) {
+#
+#     ## 1. Extract one posterior draw of beta blocks
+#     beta_blocks_i <- beta_blocks_samp[, draw_index[i]]
+#
+#     ## 2. Expand block-wise beta into full beta(t)
+#     beta_series_i <- map_blocks_exp(
+#       log(beta_blocks_i), starts, ends, timepoints
+#     )
+#
+#     ## 3. Augment beta for dust2 (define value at time_start)
+#     beta_times_i  <- c(time0, time_vec)
+#     beta_values_i <- c(beta_series_i[1], beta_series_i)
+#
+#     ## 4. Build deterministic system for this draw
+#     sys_i <- dust2::dust_system_create(
+#       gen,
+#       pars = list(
+#         N = N,
+#         I0 = I0_q[1],          # keep I0 fixed (or sample if desired)
+#         gamma = gamma,
+#         dt = 1,
+#         n_beta = length(beta_times_i),
+#         beta_values = beta_values_i,
+#         beta_times  = beta_times_i
+#       ),
+#       n_particles = 1,
+#       deterministic = TRUE
+#     )
+#
+#     dust2::dust_system_set_state_initial(sys_i)
+#
+#     ## 5. Simulate S(t)
+#     res_i <- dust2::dust_system_simulate(sys_i, time_vec)
+#
+#     S_i <- as.numeric(res_i[S_row, ])
+#
+#     ## 6. Compute Rt(t) for posterior draw
+#     Rt_mat[, i] <- (beta_series_i * S_i) / (gamma * N)
+#   }
+#
+#   ## 7. Posterior intervals
+#   Rt_lower <- apply(Rt_mat, 1, stats::quantile, 0.025, na.rm = TRUE)
+#   Rt_upper <- apply(Rt_mat, 1, stats::quantile, 0.975, na.rm = TRUE)
+# }

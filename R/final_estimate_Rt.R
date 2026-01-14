@@ -1,4 +1,3 @@
-
 #' Estimate Rt(t) from daily new cases (deterministic SIR, Poisson) — NO PRIOR
 #'   Estimating BOTH beta and gamma, with user-specified fixed I0
 #'
@@ -49,10 +48,10 @@ final_estimate_Rt <- function(incidence, N, I0,
   Tn    <- length(cases)
   t_idx <- seq_len(Tn)
 
-  ## ---- odin2 generator ----
+  ## odin2 generator
   gen <- make_sir_generator()
 
-  ## ---- Deterministic Poisson likelihood on NEW infections (inc_step) ----
+  ## Deterministic Poisson likelihood on NEW infections (inc_step)
   loglik <- function(beta, gamma) {
     if (!is.finite(beta) || beta <= 0 || !is.finite(gamma) || gamma <= 0) return(-Inf)
 
@@ -76,7 +75,7 @@ final_estimate_Rt <- function(incidence, N, I0,
     sum(stats::dpois(x = cases, lambda = lambda, log = TRUE))
   }
 
-  ## ---- Likelihood-only MCMC on theta = (log_beta, log_gamma) ----
+  ## Likelihood-only MCMC on theta = (log_beta, log_gamma)
   density_theta <- function(theta_vec) {
     log_beta  <- theta_vec[1]
     log_gamma <- theta_vec[2]
@@ -99,7 +98,7 @@ final_estimate_Rt <- function(incidence, N, I0,
 
   smp <- monty::monty_sample(mod, sampler, n_steps, initial = init, n_chains = 1)
 
-  ## ---- Extract samples (post-burnin) ----
+  ## Extract samples (post-burnin)
   pars <- smp$pars
   if (is.null(pars)) {
     stop("No parameter samples returned by monty. Check initial values and likelihood.")
@@ -150,7 +149,7 @@ final_estimate_Rt <- function(incidence, N, I0,
     stop("Median beta/gamma are not finite or non-positive; cannot compute Rt(t).")
   }
 
-  ## ---- Rt(t): posterior-median path + (optional) credible bands ----
+  ## Rt(t): posterior-median path + (optional) credible bands
   # Median path
   sys_med <- dust2::dust_system_create(
     gen(),
@@ -194,7 +193,7 @@ final_estimate_Rt <- function(incidence, N, I0,
     Rt_upper <- apply(Rt_mat, 1, stats::quantile, 0.975, na.rm = TRUE)
   }
 
-  ## ---- Return ----
+  ## Return
   list(
     samples = data.frame(
       beta  = beta_samples,
