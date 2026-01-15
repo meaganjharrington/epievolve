@@ -153,8 +153,8 @@ final_estimate_Rt_step <- function(
   pars <- sample$pars; # extract raw MCMC parameter array (dimensions vary by chain no)
     dims <- dim(pars); # stores array dimensions
       indices <- (n_burn + 1):dims[2] # indicies of post-burnin iterations
-  extract_post <- if (length(dims) == 3) as.matrix(pars[, indices, 1, drop = FALSE]) else as.matrix(pars[, indices, drop = FALSE])
-  # extract post burn-in samples (3D parameters x iterations x chains AND 2D parameters x iterations)
+
+
   # After extraction
   dims <- dim(pars)
   indices <- (n_burn + 1):dims[2]
@@ -163,56 +163,76 @@ final_estimate_Rt_step <- function(
     matrix(pars[, indices, 1], nrow = dims[1], ncol = length(indices))
   } else {
     as.matrix(pars[, indices, drop = FALSE])
-  }
+  }   # extract post burn-in samples (3D parameters x iterations x chains AND 2D parameters x iterations)
 
   # Extract beta blocks and I0 using indices
   beta_blocks_samp <- exp(extract_post[1:K, , drop = FALSE])
   I0_samp          <- exp(extract_post[K + 1, , drop = FALSE])
 
-  beta_q <- apply(beta_blocks_samp, 2, q3) # changed, see if still works # posterior summaries for each beta block (? - is this needed)
-  I0_q <- q3(I0_samp) # posterior median/95% interval for I0 (? - is this necessary)
+  ## Posterior summaries for beta(t) and Rt(t)  # Marc flag
 
-  ## Medians and Rt(t)
-  beta_med_blocks <- beta_q[, 1] # extract post. median beta for each beta block
-  beta_med_series <- map_blocks_exp(log(beta_med_blocks), starts, ends, timepoints) # expand into full time series
+  ## Expand ALL posterior beta draws to time scale
+  ## result: matrix [timepoints x n_draws] (?) - am I thinking about this matrix correctly?
+  beta_t_samp <- apply(
+    beta_blocks_samp,
+    2,
+    function(b) {
+      out <- numeric(timepoints)
+      for (k in seq_len(K))
+        out[starts[k]:ends[k]] <- b[k]
+      out
+    }
+  )
 
-  ## Augment beta vectors for system creation
+  ## posterior summaries of beta(t)
+  beta_t_q <- apply(beta_t_samp, 1, q3)
+
+  beta_med_series <- beta_t_q["50%", ]
+  beta_lo_series  <- beta_t_q["2.5%", ]
+  beta_hi_series  <- beta_t_q["97.5%", ]
+
+  ## posterior summaries of I0
+  I0_q <- q3(I0_samp) # 0.5, 0.975, 0.025
+
+  ## deterministic S(t) using posterior median beta(t) and I0
   beta_times_med  <- c(time0, time_vec)
   beta_values_med <- c(beta_med_series[1], beta_med_series)
 
   sys_med <- dust2::dust_system_create(
     gen,
     pars = list(
-      N = N, I0 = I0_q[1], gamma = gamma, dt = 1,
+      N = N,
+      I0 = I0_q[1],
+      gamma = gamma,
+      dt = 1,
       n_beta = length(beta_times_med),
       beta_values = beta_values_med,
       beta_times  = beta_times_med
     ),
-    n_particles = 1, deterministic = TRUE
-  ) # generate determinstic system using posterior median parameters on I0 and beta(t)
-  dust2::dust_system_set_state_initial(sys_med)
-  res_med <- dust2::dust_system_simulate(sys_med, time_vec)  # simulate over data times only
+    n_particles = 1,
+    deterministic = TRUE
+  )
 
-  ## Extract S(t) and incidence
+  dust2::dust_system_set_state_initial(sys_med)
+  res_med <- dust2::dust_system_simulate(sys_med, time_vec)
+
+  ## pull S(t)
   rn_med <- rownames(res_med)
   if (!is.null(rn_med)) {
-    S_row   <- which(rn_med == "S")
-    #I_row   <- which(rn_med == "I")
-    #R_row   <- which(rn_med == "R")
-    inc_row <- which(rn_med == "incidence")
+    S_row <- which(rn_med == "S")
   } else {
-    # fallback if rownames missing
-    S_row   <- 1L
-    inc_row <- 3L  # incidence is the 3rd row in your generator
+    S_row <- 1L
   }
 
-  S_t        <- as.numeric(res_med[S_row, ])
-  #I_t        <- as.numeric(res_med[I_row, ])
-  lambda_med <- pmax(as.numeric(res_med[inc_row, ]), 1e-12)
-  Rt_median     <- (beta_med_series * S_t) / (gamma * N)
+  S_t <- as.numeric(res_med[S_row, ])
 
-  ## NEW!! - need to check this approach works/is accurate
+  # Rt(t) posterior median and 95% CI
+  Rt_median <- (beta_med_series * S_t) / (gamma * N)
+  Rt_lower  <- (beta_lo_series  * S_t) / (gamma * N)
+  Rt_upper  <- (beta_hi_series  * S_t) / (gamma * N)
 
+  ## Block-level beta summaries (basically just for return function)
+  beta_block_q <- t(apply(beta_blocks_samp, 1, q3))
 
   ## Return
   list(
@@ -220,8 +240,11 @@ final_estimate_Rt_step <- function(
     estimates = list(
       beta_blocks = data.frame(
         block = seq_len(K), start = starts, end = ends,
-        beta_median = beta_q[, 1], beta_lower = beta_q[, 2], beta_upper = beta_q[, 3]
-      ),
+        beta_median = beta_block_q[, "50%"],
+        beta_lower  = beta_block_q[, "2.5%"],
+        beta_upper  = beta_block_q[, "97.5%"]
+      )
+      ,
       I0 = data.frame(I0_median = I0_q[1], I0_lower = I0_q[2], I0_upper = I0_q[3])
     ),
     Rt_series = data.frame(time = time_vec, Rt_median = Rt_median),
@@ -236,65 +259,3 @@ final_estimate_Rt_step <- function(
     diagnostics = sample$diagnostics # need to get working
   )
 }
-
-
-
-
-## Archive
-# trying to extract and run 95% CIs with median
-#
-# Rt_lower <- Rt_upper <- rep(NA_real_, timepoints)
-#
-# if (n_rt_draws > 0) {
-#
-#   ## Start with all posterior draws
-#   draw_index <- seq_len(ncol(beta_blocks_samp))
-#
-#   ## Storage: rows = time, cols = posterior draws
-#   Rt_mat <- matrix(NA_real_, nrow = timepoints, ncol = length(draw_index))
-#
-#   for (i in seq_along(draw_index)) {
-#
-#     ## 1. Extract one posterior draw of beta blocks
-#     beta_blocks_i <- beta_blocks_samp[, draw_index[i]]
-#
-#     ## 2. Expand block-wise beta into full beta(t)
-#     beta_series_i <- map_blocks_exp(
-#       log(beta_blocks_i), starts, ends, timepoints
-#     )
-#
-#     ## 3. Augment beta for dust2 (define value at time_start)
-#     beta_times_i  <- c(time0, time_vec)
-#     beta_values_i <- c(beta_series_i[1], beta_series_i)
-#
-#     ## 4. Build deterministic system for this draw
-#     sys_i <- dust2::dust_system_create(
-#       gen,
-#       pars = list(
-#         N = N,
-#         I0 = I0_q[1],          # keep I0 fixed (or sample if desired)
-#         gamma = gamma,
-#         dt = 1,
-#         n_beta = length(beta_times_i),
-#         beta_values = beta_values_i,
-#         beta_times  = beta_times_i
-#       ),
-#       n_particles = 1,
-#       deterministic = TRUE
-#     )
-#
-#     dust2::dust_system_set_state_initial(sys_i)
-#
-#     ## 5. Simulate S(t)
-#     res_i <- dust2::dust_system_simulate(sys_i, time_vec)
-#
-#     S_i <- as.numeric(res_i[S_row, ])
-#
-#     ## 6. Compute Rt(t) for posterior draw
-#     Rt_mat[, i] <- (beta_series_i * S_i) / (gamma * N)
-#   }
-#
-#   ## 7. Posterior intervals
-#   Rt_lower <- apply(Rt_mat, 1, stats::quantile, 0.025, na.rm = TRUE)
-#   Rt_upper <- apply(Rt_mat, 1, stats::quantile, 0.975, na.rm = TRUE)
-# }
