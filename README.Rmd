@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 ```
-
+dev
 # epievolve
 
 <!-- badges: start -->
@@ -34,20 +34,22 @@ devtools::install_github("meaganjharrington/epievolve")
 ## Example
 
 ``` r
-# not sure if this works as of 7/01
 library(epievolve)
-df <- read.csv(incidence.csv)
 
-cases <- c(3,2,2,2,1,3)
-time <- c(1,2,3,4,5,6)
+df <- read.csv("tests/testthat/incidence.csv", stringsAsFactors = FALSE)
+names(df) <- tolower(names(df))
+df$time  <- as.integer(df$time)
+df$cases <- as.integer(df$cases)
 
 out <- final_estimate_Rt_step(
-incidence = df,
-N = 1e6,
-gamma = 1/6,
-beta_breaks = c(1, 3)
+  incidence = df,
+  N = 1e6,
+  gamma = 1/6,
+  beta_breaks = c(1, 17, 35)
 )
 
-plot(out$Rt_series)
+head(out$Rt_series)
+
+out$Rt_plot # print Rt(t) plot over time
 
 ```

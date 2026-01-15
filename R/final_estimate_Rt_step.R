@@ -5,7 +5,7 @@
 #'        Time can start at any integer, we keep it and set time_start to "first time - 1".
 #' @param N Numeric scalar > 0, population size
 #' @param gamma Numeric scalar > 0, fixed recovery rate
-#' @param R Immunity existing in population, default = 0
+#' # R Immunity existing in population, default = 0 - add back in once baseline immunity functionality added!
 #' @param beta_breaks Integer vector in ORIGINAL time units; mapped to indices internally
 #' @param mcmc List: n_steps (6000), burnin (0.5), proposal (NULL -> diag(0.02^2)), seed (4),
 #'              n_rt_draws (300)
@@ -104,7 +104,8 @@ final_estimate_Rt_step <- function(
     gen,
     data = dust_data,
     time_start = time0,  # strictly less than first data time
-    dt = 1
+    dt = 1,
+    n_particles = 1
   )
 
   ## Likelihood using dust2
@@ -169,7 +170,7 @@ final_estimate_Rt_step <- function(
   beta_blocks_samp <- exp(extract_post[1:K, , drop = FALSE])
   I0_samp          <- exp(extract_post[K + 1, , drop = FALSE])
 
-  ## Posterior summaries for beta(t) and Rt(t)  # Marc flag
+  ## Posterior summaries for beta(t) and Rt(t)  # Marc flag - everything from here down!
 
   ## Expand ALL posterior beta draws to time scale
   ## result: matrix [timepoints x n_draws] (?) - am I thinking about this matrix correctly?
@@ -187,16 +188,16 @@ final_estimate_Rt_step <- function(
   ## posterior summaries of beta(t)
   beta_t_q <- apply(beta_t_samp, 1, q3)
 
-  beta_med_series <- beta_t_q["50%", ]
-  beta_lo_series  <- beta_t_q["2.5%", ]
-  beta_hi_series  <- beta_t_q["97.5%", ]
+  beta_median_series <- beta_t_q["50%", ]
+  beta_lower_series  <- beta_t_q["2.5%", ]
+  beta_higher_series  <- beta_t_q["97.5%", ]
 
   ## posterior summaries of I0
   I0_q <- q3(I0_samp) # 0.5, 0.975, 0.025
 
   ## deterministic S(t) using posterior median beta(t) and I0
   beta_times_med  <- c(time0, time_vec)
-  beta_values_med <- c(beta_med_series[1], beta_med_series)
+  beta_values_med <- c(beta_median_series[1], beta_median_series)
 
   sys_med <- dust2::dust_system_create(
     gen,
@@ -206,10 +207,10 @@ final_estimate_Rt_step <- function(
       gamma = gamma,
       dt = 1,
       n_beta = length(beta_times_med),
+      n_particles = 1,
       beta_values = beta_values_med,
       beta_times  = beta_times_med
     ),
-    n_particles = 1,
     deterministic = TRUE
   )
 
@@ -227,12 +228,49 @@ final_estimate_Rt_step <- function(
   S_t <- as.numeric(res_med[S_row, ])
 
   # Rt(t) posterior median and 95% CI
-  Rt_median <- (beta_med_series * S_t) / (gamma * N)
-  Rt_lower  <- (beta_lo_series  * S_t) / (gamma * N)
-  Rt_upper  <- (beta_hi_series  * S_t) / (gamma * N)
+  Rt_median <- (beta_median_series * S_t) / (gamma * N)
+  Rt_lower  <- (beta_lower_series  * S_t) / (gamma * N)
+  Rt_upper  <- (beta_higher_series  * S_t) / (gamma * N)
 
   ## Block-level beta summaries (basically just for return function)
   beta_block_q <- t(apply(beta_blocks_samp, 1, q3))
+
+  # making a basic Rt plot!
+  # Combine Rt summaries for plotting
+  Rt_series <- data.frame(time = time_vec, Rt_median = Rt_median)
+  Rt_lower  <- data.frame(time = time_vec, Rt_lower  = Rt_lower)
+  Rt_upper  <- data.frame(time = time_vec, Rt_upper  = Rt_upper)
+
+  rt_df <- merge(Rt_series, Rt_lower, by = "time")
+  rt_df <- merge(rt_df, Rt_upper, by = "time")
+
+  Rt_plot <- ggplot2::ggplot(rt_df, ggplot2::aes(x = time)) +
+    ggplot2::geom_ribbon(
+      ggplot2::aes(ymin = Rt_lower, ymax = Rt_upper),
+      fill = "steelblue",
+      alpha = 0.25
+    ) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = Rt_median),
+      color = "steelblue",
+      linewidth = 1
+    ) +
+    ggplot2::geom_hline(
+      yintercept = 1,
+      linetype = "dashed",
+      color = "grey40"
+    ) +
+    ggplot2::scale_y_continuous(
+      limits = c(0, 5),
+      oob = scales::squish
+    ) +
+    ggplot2::labs(
+      x = "Time",
+      y = expression(R[t]),
+      title = "Time-varying Reproduction Number"
+    ) +
+    ggplot2::theme_minimal()
+
 
   ## Return
   list(
@@ -249,8 +287,9 @@ final_estimate_Rt_step <- function(
     ),
     Rt_series = data.frame(time = time_vec, Rt_median = Rt_median),
     St_series = data.frame(time = time_vec, St = S_t),
-    Rt_lower = data.frame(time = time_vec, Rt_lower = Rt_lower),
-    Rt_upper = data.frame(time = time_vec, Rt_upper = Rt_upper),
+    Rt_lower = Rt_lower,
+    Rt_upper = Rt_upper,
+    Rt_plot   = Rt_plot,
     #It_series = data.frame(t = time_vec, It = I_t),
     model_used = "SIR_deterministic_step_beta_gamma_fixed_dust2_monty",
     blocks = list(beta_starts = starts, beta_ends = ends),
