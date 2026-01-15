@@ -16,7 +16,10 @@ BugReports: https://github.com/meaganjharrington/epievolve/issues
 Imports:
     odin2,
     dust2,
-    monty
+    monty,
+    ggplot2,
+    scales,
+    stats
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
