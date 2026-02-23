@@ -22,7 +22,6 @@ calculate_loglikelihood <- function(
   force(map_blocks_exp); force(dt)
 
   loglikelihood <- function(theta) {
-    # Unpack theta = [log_beta_1..log_beta_K, log_I0]
     log_I <- theta[K + 1L]
     I0    <- exp(log_I)
     if (!is.finite(I0) || I0 <= 0) return(-Inf)
@@ -40,9 +39,7 @@ calculate_loglikelihood <- function(
       beta_series = beta_series, dt = dt
     )
 
-    # dust2 returns a vector of log-likelihood contributions; sum them
     sum(dust2::dust_likelihood_run(filter, pars))
   }
-
   loglikelihood
 }

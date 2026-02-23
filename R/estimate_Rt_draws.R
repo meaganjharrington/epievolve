@@ -90,6 +90,7 @@ estimate_Rt_draws <- function(
     N,
     gamma,
     beta_breaks = NULL,
+    max_attack_rate = NULL,
     mcmc  = list(n_steps = 6000, burnin = 0.7, proposal = NULL,
                  seed = 4, n_rt_draws = 1000),
     priors = list(mean_beta = log(0.3), sd_beta = 0.1, rw_sd_beta = 0.05,
@@ -97,7 +98,7 @@ estimate_Rt_draws <- function(
     inits  = list(beta = 0.3, I0 = 10)
 ) {
   ## 1) Validate inputs
-  inp <- validate_inputs(incidence, N, gamma, mcmc, priors, inits)
+  inp <- validate_inputs(incidence, N, gamma, mcmc, priors, inits, max_attack_rate = max_attack_rate)
 
   ## 2) Beta-block construction
   blocks <- build_beta_blocks(beta_breaks, inp$time_vec, inp$timepoints)
@@ -130,7 +131,8 @@ estimate_Rt_draws <- function(
     rw_sd_beta  = inp$rw_sd_beta,
     mean_I0     = inp$mean_I0,
     sd_I0       = inp$sd_I0,
-    loglik      = likelihood$loglikelihood
+    loglik      = likelihood$loglikelihood,
+    beta_max   = inp$beta_max
   )
 
   ## 7) MCMC sampling

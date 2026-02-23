@@ -12,7 +12,7 @@
 #'
 #' @return
 #' @keywords internal
-validate_inputs <- function(incidence, N, gamma, mcmc, priors, inits) {
+validate_inputs <- function(incidence, N, gamma, mcmc, priors, inits, max_attack_rate = NULL) {
 
 ## Validate main inputs - error messages
 # ensure data frame with expected columns
@@ -25,6 +25,23 @@ if (!all(diff(time_vec) == 1L))
   stop("`incidence$time` must be consecutive integers.") # time series
 stopifnot(all(is.finite(time_vec)), all(is.finite(cases)), all(cases >= 0)) # all time and cases are finite (and cases are non-neg)
 stopifnot(is.numeric(N) && N > 0, is.numeric(gamma) && gamma > 0) # N and gamme +ve
+
+# ATTEMPT TO ADD MAX ATTACK RATE TO PREVENT COMPLETE S DEPLETION
+## Validate max_attack_rate if provided
+if (!is.null(max_attack_rate)) {
+  stopifnot(
+    is.numeric(max_attack_rate),
+    length(max_attack_rate) == 1L,
+    max_attack_rate > 0,
+    max_attack_rate < 1
+  )
+  # Final size equation: a = 1 - exp(-R0 * a)
+  # For small a, R0_max ≈ -log(1-a) / a
+  R0_max   <- -log(1 - max_attack_rate) / max_attack_rate
+  beta_max <- R0_max * gamma
+} else {
+  beta_max <- NULL
+}
 
 # total_cases  <- sum(cases)
 # attack_rate <- total_cases / N # calculate attack rate as logic check, only accepts >1% or <50%
@@ -82,7 +99,8 @@ return(list(
   mean_I0 = mean_I0,
   sd_I0 = sd_I0,
   init_beta = init_beta,
-  init_I0 = init_I0
+  init_I0 = init_I0,
+  beta_max = beta_max
 ))
 
 }

@@ -1,0 +1,4 @@
+scenario,coverage,mean_bias,rmse,ci_width
+"Gradual decline (N=1M, R0: 1.4→1.12→0.88)",100,-0.003,0.119,0.885
+"COVID-19 lockdown (N=10M, R0: 2.8→0.85)",100,-0.235,0.574,3.405
+"Influenza H1N1 (N=10M, R0: 1.6→1.3→1.1)",96,-0.15,0.21,1.326
