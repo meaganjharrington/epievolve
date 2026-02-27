@@ -85,7 +85,7 @@
 #' @param inits  List: beta=0.3, I0=10
 #' @return list(samples, estimates, Rt_series, fit, diagnostics, model_used, blocks, fixed)
 #' @export
-  estimate_Rt <- function(
+  archive_estimate_Rt <- function(
     incidence,
     N,
     gamma,
