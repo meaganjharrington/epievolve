@@ -1,0 +1,4 @@
+"Scenario","N","Observed_total","Model_total","Attack_rate_pct"
+"S1: Gradual decline",5000,2157,2234,43.14
+"S2: COVID-19 lockdown-like",10000,7695,7752,76.95
+"S3: Influenza H1N1-like",5e+05,362843,362934,72.569
