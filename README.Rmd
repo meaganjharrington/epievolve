@@ -49,9 +49,6 @@ out_flu <- estimate_R_blocks(
   beta_breaks = c(1, 8, 18, 25),
   priors = list(mean_beta = log(0.5), sd_beta = 0.5,
                 rw_sd_beta = 0.3, mean_I0 = log(5), sd_I0 = 0.5),
-  inits  = list(beta = 0.5, I0 = 5),
-  mcmc   = list(n_steps = 15000, burnin = 0.5,
-                seed = 444, n_chains = 3)
 )
 
 # View Rt series and plot
