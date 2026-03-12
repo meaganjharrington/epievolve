@@ -16,6 +16,13 @@ estimate_R_blocks(
 )
 }
 \arguments{
+\item{data}{data.frame with columns: time (consecutive integers), cases >= 0.
+Time can start at any integer, we keep it and set time_start to "first time - 1".
+\itemize{
+\item time : consecutive integers (any starting value allowed)
+\item cases: non-negative integers (daily incidence)
+}}
+
 \item{N}{Numeric scalar > 0, population size}
 
 \item{gamma}{Numeric scalar > 0, fixed recovery rate
@@ -34,13 +41,6 @@ mean_I0=log(10), sd_I0=0.5}
 - proposal (NULL -> diag(0.02^2))
 - seed (4)
 - n_rt_draws (300) posterior draws for Rt uncertainty bands}
-
-\item{incidence}{data.frame with columns: time (consecutive integers), cases >= 0.
-Time can start at any integer, we keep it and set time_start to "first time - 1".
-\itemize{
-\item time : consecutive integers (any starting value allowed)
-\item cases: non-negative integers (daily incidence)
-}}
 }
 \value{
 list(samples, estimates, Rt_series, fit, diagnostics, model_used, blocks, fixed)

@@ -23,7 +23,7 @@
 #' Using full odin2 -> dust2 -> monty workflow (deterministic likelihood)
 #' log-posterior = loglikelihood + logprior
 #'
-#' @param incidence data.frame with columns: time (consecutive integers), cases >= 0.
+#' @param data data.frame with columns: time (consecutive integers), cases >= 0.
 #' Time can start at any integer, we keep it and set time_start to "first time - 1".
 #'   - time : consecutive integers (any starting value allowed)
 #'   - cases: non-negative integers (daily incidence)
