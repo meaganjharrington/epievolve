@@ -13,7 +13,8 @@ knitr::opts_chunk$set(
 # rodent package
 <!-- badges: start -->
 <!-- badges: end -->
-The goal of rodent is to estimate time-varying Rt(t) using the odin-monty framework. Estimates Rt(t) from time series of case counts using a mechanistic SIR model. Enables interpretable inference on epidemic dynamics and intervention effects.
+The goal of rodent is to estimate the time-varying reproduction number Rt from case count time series using a deterministic SIR model with piecewise constant transmission rate. Built on the odin2-dust2-monty ecosystem, it supports explicit user-specified change points and full Bayesian inference, enabling interpretable evaluation of intervention effects and epidemic dynamics.
+
 ## Installation
 You can install the development version of rodent from [GitHub](https://github.com/) with:
 ``` r
