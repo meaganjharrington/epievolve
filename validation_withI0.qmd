@@ -780,8 +780,6 @@ fig_flu_2x2 <-
   (fig6 + fig7) /
   (rodent_smooth + epiestim_smooth) +
   plot_annotation(
-    title = "Influenza A(H1N1) 2009 — Transmission Summary",
-    subtitle = "Top: incidence & blockwise Rt   |   Bottom: rodent smooth Rt & EpiEstim smooth Rt",
     tag_levels = "A",
     theme = theme(
       plot.title = element_text(size = 14, face = "bold"),
@@ -929,8 +927,6 @@ ebola_2x2 <-
   (fig10 + fig11) /
   (rodent_smooth_ebola + epiestim_smooth_ebola) +
   plot_annotation(
-    title = "Ebola Sierra Leone 2014 — Transmission Summary",
-    subtitle = "Top: incidence & blockwise Rt   |   Bottom: rodent smooth Rt & EpiEstim sliding Rt",
     tag_levels = "A",
     theme = theme(
       plot.title = element_text(size = 14, face = "bold"),

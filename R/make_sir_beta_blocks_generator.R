@@ -5,7 +5,7 @@ make_sir_beta_blocks_generator <- function() {
     initial(I) <- I0
     initial(incidence, zero_every = 1) <- 0
 
-    # deterministic transition probabilities
+    # deterministic transition probabilities (deterministic approximation of ODEs)
     p_SI <- 1 - exp(-beta_t * I / N * dt)
     p_IR <- 1 - exp(-gamma * dt)
 

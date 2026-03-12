@@ -57,45 +57,36 @@ estimate_R_blocks <- function(data,
                                            burnin   = 0.5,
                                            seed     = 4)) {
 
-  ## -------------------------------------------------------------------
   ## 0. Setup
-  ## -------------------------------------------------------------------
   data  <- data[order(data$time), , drop = FALSE]
   time  <- data$time
   Tlen  <- length(time)
 
-  # IMPORTANT: unfilter requires time[1] > time_start
   time_start <- min(time) - 1L
 
-  # β grid must cover the model start for interpolation to work
+  # beta grid to cover model start for interpolation to work
   beta_times <- sort(unique(beta_breaks))
   if (beta_times[1] > time_start) {
     beta_times <- c(time_start, beta_times)
   }
   K <- length(beta_times)
 
-  ## -------------------------------------------------------------------
-  ## 1. odin2 model using interpolate() for beta(t)
-  ## -------------------------------------------------------------------
-  sir <- make_sir_beta_blocks_generator()
+  ## 1. odin2 model
+  # interpolate() for beta(t)
+  sir <- make_sir_beta_blocks_generator() # see other file
 
-  ## -------------------------------------------------------------------
   ## 2. dust unfilter
-  ## -------------------------------------------------------------------
   filter <- dust2::dust_unfilter_create(
     sir,
     data       = data,
     time_start = time_start
   )
 
-  ## -------------------------------------------------------------------
-  ## 3. Parameter names (what the sampler sees): beta_1..beta_K, I0
-  ## -------------------------------------------------------------------
+  ## 3. Parameter names
+  # beta_1..beta_K, I0
   par_names <- c(sprintf("beta_%d", seq_len(K)), "I0")
 
-  ## -------------------------------------------------------------------
   ## 4. Likelihood via dust_likelihood_run()
-  ## -------------------------------------------------------------------
   likelihood <- monty::monty_model(
     list(
       parameters = par_names,
@@ -114,14 +105,13 @@ estimate_R_blocks <- function(data,
           beta_values = beta_vals
         )
 
-        dust2::dust_likelihood_run(filter, pars)  # no save_trajectories
+        dust2::dust_likelihood_run(filter, pars)
       }
     )
   )
 
-  ## -------------------------------------------------------------------
-  ## 5. Prior (log-normal on β_k and I0, with RW smoothness on log β)
-  ## -------------------------------------------------------------------
+  ## 5. Prior beta_k and I0
+  # random-walk on log beta
   prior <- monty::monty_model(
     list(
       parameters = par_names,
@@ -152,14 +142,10 @@ estimate_R_blocks <- function(data,
     )
   )
 
-  ## -------------------------------------------------------------------
   ## 6. Posterior
-  ## -------------------------------------------------------------------
   posterior <- likelihood + prior
 
-  ## -------------------------------------------------------------------
   ## 7. Sample
-  ## -------------------------------------------------------------------
   set.seed(mcmc$seed %||% 1L)
 
   init_theta <- c(rep(inits$beta, K), inits$I0)
@@ -175,9 +161,7 @@ estimate_R_blocks <- function(data,
     n_chains = mcmc$n_chains %||% 3L
   )
 
-  ## -------------------------------------------------------------------
-  ## 8. Thin + extract draws
-  ## -------------------------------------------------------------------
+  ## 8. Process burnins + extract draws
   burn     <- floor((mcmc$burnin %||% 0.5) * dim(samples$pars)[2])
   thin     <- monty::monty_samples_thin(samples, burnin = burn)
   pars_arr <- thin$pars
@@ -187,9 +171,7 @@ estimate_R_blocks <- function(data,
   beta_draws <- pars_mat[seq_len(K), , drop = FALSE]
   I0_draws   <- pars_mat[K + 1L, ]
 
-  ## -------------------------------------------------------------------
   ## 9. Expand posterior beta(t) for Rt calculation
-  ## -------------------------------------------------------------------
   expand_beta_blocks <- function(beta_vec, beta_times, tvec) {
     out <- numeric(length(tvec))
     for (k in seq_along(beta_times)) {
@@ -206,9 +188,7 @@ estimate_R_blocks <- function(data,
     numeric(Tlen)
   )
 
-  ## -------------------------------------------------------------------
-  ## 10. Extract S(t) by re-simulating at posterior draws
-  ## -------------------------------------------------------------------
+  ## 10. Extract S(t)
   time_start <- min(time) - 1L
 
   S_mat <- matrix(NA_real_, nrow = Tlen, ncol = D)
@@ -236,9 +216,7 @@ estimate_R_blocks <- function(data,
     S_mat[, d] <- drop(unpacked$S)
   }
 
-  ## -------------------------------------------------------------------
   ## 11. Rt(t) = (beta(t) / gamma) * S(t) / N
-  ## -------------------------------------------------------------------
   Rt_mat <- (beta_t_mat / gamma) * (S_mat / N)
 
   qfun <- function(x) stats::quantile(x, c(0.025, 0.5, 0.975))
@@ -248,9 +226,7 @@ estimate_R_blocks <- function(data,
     data.frame(time = time, q)
   }
 
-  ## -------------------------------------------------------------------
   ## 12. Return
-  ## -------------------------------------------------------------------
   list(
     samples          = thin,
     beta_draws       = beta_draws,
