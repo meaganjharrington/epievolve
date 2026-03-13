@@ -29,9 +29,17 @@ closure from day 18 to 24.
 Change points are set at days 1, 8, 18, and 25, with the third block capturing the 
 period of school closure.
 ``` r
+install.packages(c("odin2", "dust2", "monty"), 
+                 repos = c("https://mrc-ide.r-universe.dev", 
+                           "https://cloud.r-project.org"))
+
+library(odin2)
+library(dust2)
+library(monty)
 library(rodent)
 library(EpiEstim)
 library(dplyr)
+
 
 # Prepare incidence data
 data(Flu2009)
