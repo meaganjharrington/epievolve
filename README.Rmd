@@ -10,7 +10,7 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 ```
-# rodent package
+# rodent <img src="man/figures/logo.png" align="right" height="139"/>
 <!-- badges: start -->
 <!-- badges: end -->
 The goal of rodent is to estimate the time-varying reproduction number Rt from case count time series using a deterministic SIR model with piecewise constant transmission rate. Built on the odin2-dust2-monty ecosystem, it supports explicit user-specified change points and full Bayesian inference, enabling interpretable evaluation of intervention effects and epidemic dynamics.
